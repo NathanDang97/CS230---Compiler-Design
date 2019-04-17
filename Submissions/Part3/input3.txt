@@ -1,0 +1,20 @@
+void main()
+{
+   int a, b;
+   int c;
+   
+   if (a > b)
+      c = a + b;
+   else if (a == b) {
+   	bool done;
+   	int d, e;
+   	while (!done) {   		
+   		d = a + a + b;
+   		e = a - b - b;
+         if (d == e)
+            done = !done;
+   	}
+   }
+   else 
+   	c = a - b;
+} 
