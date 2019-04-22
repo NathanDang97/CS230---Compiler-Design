@@ -1,0 +1,9 @@
+void main()
+{
+	int a, b;
+	int c, d;
+    a = a + b;
+    b = b + a;
+    c = c + d;
+    d = d + c;
+}

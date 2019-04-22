@@ -40,7 +40,7 @@ public class Parser {
       }
    }
 
-    public static void toString(AST t, int level) {
+   public static void toString(AST t, int level) {
         // if its left/right leaf is null, print "-"
         if (t == null) {
             indent(level);
@@ -108,7 +108,7 @@ PARSER_END(Parser)
     | <NOT: "!">
  }
 
-AST Input() :
+void Input() :
 { 
     AST tree = null; 
 }
@@ -120,7 +120,6 @@ AST Input() :
    tree = program() <EOF>
    {
       toString(tree, 1);
-      return tree;
    }
 }
 
@@ -136,7 +135,7 @@ BEGIN: Specification of language
 // <program> → void main () <block>
 AST program() :
 { 
-    AST tree, op, l, r;
+    AST tree, op;
 }
 {
     <KEYWORD> <KEYWORD> <OPENPAREN> <CLOSEPAREN> 
@@ -147,21 +146,14 @@ AST program() :
 // <block> → { <declarations> <optional_statements>? }
 AST block() :
 { 
-    AST tree = null, op, l = null, r;  
+    AST tree = null, op, l;   
 }
 {
     <BEGIN> 
     l = declarations() 
-    (r = optional_statements() {
-        if (l != null) {
-            op = new Node("program", l, r);
-            tree = op;
-        }
-        else {
-            tree = r;
-            op = new Node("program", null, tree);
-            tree = op;
-        }
+    (tree = optional_statements() {
+        op = new Node("program", l, tree);
+        tree = op;
     })? 
     <END>
     { return tree; }
@@ -170,16 +162,14 @@ AST block() :
 // <declarations>  →  (<declaration>)*
 AST declarations() :
 {
-    AST tleft = null, tright = null;
+    AST tree = null, op;
 }
 {
-    (tright = declaration() {
-        if (tleft != null)
-            tleft = new Node(";", tleft, tright);
-        else
-            tleft = tright;
+    (tree = declaration() {
+        op = new Node(";", declaration(), tree);
+        tree = op;
     })*
-    { return tleft; }
+    { return tree; }
 }
 
 // <declaration>  →  <type> <identifier_list>; 
@@ -201,16 +191,14 @@ AST declaration() :
 // <identifier_list>  →  <id>  ( , <id> )*
 AST identifier_list(): 
 {
-    Token t;
-    String comma;
-    AST tree, op, l, r;
+    Token t1, t2, t3;
+    AST tree, op, r;
 }
 {
-    t = <IDENTIFIER> { tree = new Leaf(t.image); } 
-    (t = <COMMA> { comma = t.image; } 
-    t = <IDENTIFIER> {
-        r = new Leaf(t.image); 
-        op = new Node(comma, tree, r);
+    t1 = <IDENTIFIER> { tree = new Leaf(t1.image); } 
+    (t2 = <COMMA> t3 = <IDENTIFIER> { r = new Leaf(t3.image); } 
+    {
+        op = new Node(t2.image, tree, r);
         tree = op;
     })*
     { return tree; }
@@ -309,21 +297,21 @@ AST expression() :
     AST tree, op, r;
 }
 {
-    tree = simple_expression() r = relopclause(tree) {
+    tree = simple_expression() r = relopclause() {
         if (r != null) tree = r;
     }
     { return tree; }
 }
 
 // <relopclause> -> <relop> <simple_expression> | ε  
-AST relopclause(AST left) :
+AST relopclause() :
 {
     Token t;
     AST tree = null, op;
 }
 {
    [t = <RELOP> tree = simple_expression() {
-      op = new Node(t.image, left, tree);
+      op = new Node(t.image, tree, tree);
       tree = op;
    }]
    { return tree; }
@@ -366,7 +354,7 @@ AST term() :
 AST factor() :
 {
     Token t;
-    AST tree, op;
+    AST tree;
 }
 {
     t = <IDENTIFIER> { return new Leaf(t.image); }
@@ -376,11 +364,8 @@ AST factor() :
     | 
     t = <DIGIT> { return new Leaf(t.image); }
     |
-    t = <NOT> tree = factor() {
-        op = new Node(t.image, null, tree);
-        tree = op;
-    }
-    { return tree; }
+    <NOT> tree = factor()
+    { return null; }
 }
 
 /* END: Specification of language */

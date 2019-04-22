@@ -1,0 +1,16 @@
+void main ()
+{
+   int i,j;
+   bool variable;
+   int m, n;
+   if (i > j)
+    {
+     i = i + j;
+     j = i - 2;
+    }
+   else if (!variable)
+    if (i <= j)
+     i = 0;
+    else
+     j = 0;
+}
