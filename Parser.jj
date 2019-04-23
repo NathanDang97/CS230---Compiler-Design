@@ -17,8 +17,9 @@
 
  /*
     What this file does: after receiving this file, javacc will produce a .java file (Parser.java)
-    which not only prints tokens but also prints out each successful reduction. The grammatical symbols
-    are nicely indented so that the structure of the parse tree is evident in the output 
+    which will build an Abstract Syntax Tree (AST) based on the given grammar. The Parser.java file 
+    will also print the tree with nice indentation and easy to read. Finally, the Parser will return
+    the AST instead of "void" as a preliminary for the last part of the project, the code generator
  */
 
 PARSER_BEGIN(Parser)
@@ -27,29 +28,59 @@ import java.io.*;
 import java.util.*;
 
 public class Parser {
-   public static class ASTNode {
-      String value;
-      ASTNode left;
-      ASTNode right;
-   }
    public static void main(String[] args) throws ParseException, FileNotFoundException {
       Parser parser = new Parser(new FileInputStream(args[0]));
       parser.Input();
    }
 
+   // indentation
    public static void indent(int n) {
       for (int i = 0; i < n; ++i) {
          System.out.print(" ");
          System.out.print(" ");
+         System.out.print(" ");
       }
    }
+
+    // print the tree
+    public static void toString(AST t, int level) {
+        // if its left/right leaf is null, print "-"
+        if (t == null) {
+            indent(level);
+            System.out.println("-");
+            return;
+        }
+        indent(level);
+        System.out.println(t.value);
+        // if it's a leaf, return
+        if (t.left == null && t.right == null) return;
+        toString(t.left, level + 1);
+        toString(t.right, level + 1);
+    }
+}
+
+abstract class AST {
+    String value;
+    AST left, right;
+}
+class Leaf extends AST {
+    Leaf(String val) {
+        this.value = val;
+        this.left = null;
+        this.right = null;
+    }
+}
+class Node extends AST {
+    Node(String val, AST l, AST r) {
+        this.value = val; 
+        this.left = l; 
+        this.right = r;
+    }
 }
 
 PARSER_END(Parser)
 
- /* BEGIN: Specification of tokens */
-
-// ignore blanks and spaces
+// skip blanks & spaces
  SKIP: 
  {
    " "
@@ -58,13 +89,14 @@ PARSER_END(Parser)
    | "\r"
  }
 
-// list of tokens
+// tokens inside the current grammars
  TOKEN:
  {
     <KEYWORD: "void" | "main" | "if" | "else" | "while">
     | <TYPE: "int" | "bool">
     | <RELOP: "==" | "!=" | "<" | "<=" | ">" | ">=">
     | <ADDOP: "+" | "-" | "||">
+    | <SIGN: "+" | "-">
     | <MULTOP: "*" | "/" | "%" | "&&">
     | <ASSIGNOP: "=">
     | <SEMICOLON: ";">
@@ -75,358 +107,287 @@ PARSER_END(Parser)
     | <IDENTIFIER: <LETTER> (<LETTER> | <DIGIT>)*>
     | <LETTER: ["a"-"z"] | ["A" - "Z"]>
     | <DIGIT: ["0"-"9"]>
-    | <SIGN: "+" | "-">
     | <COMMA: ",">
     | <NOT: "!">
  }
 
-/* END: Specification of tokens */
-
-/* 
-BEGIN: Specification of language
-  - Recursive decent is applied.  
-  - Printing actions are embedded so that token and parse info is printed as it goes.
-  - Each rule of the grammar is attached as a comment line before each corresponding function for easy reading.
-  - Each function, starting from block(), will have an integer argument, say 'n', which indicates the "level/"depth" of that rule
-  in the grammar, that is, n will increase by 1 when it goes one level deeper. This will help give the correct indentation for the output since the indent(int n) method will produce the spaces based on 'n'.
-*/
-
-void Input():
-{ }
+// return the AST after parsing the input file
+AST Input() :
+{ 
+    AST tree = null; 
+}
 {
    { 
       System.out.println("Parsing the input file..."); 
       System.out.println("-------------------------");
    }
-   program() <EOF>
+   tree = program() <EOF>
+   {
+      toString(tree, 1);
+      return tree;
+   }
 }
+
+/* 
+BEGIN: Specification of language
+  - Recursive decent is applied.  
+  - The AST will be built during recursive decent
+  - Each operator should have 2 children except for "program" and "!" which can have one child
+  - The empty child will be printed as "-"
+*/
 
 // <program> → void main () <block>
-ASTNode program() :
+AST program() :
 { 
-   ASTNode op = new ASTNode(); 
-   ASTNode tree = new ASTNode(); 
-   ASTNode r = new ASTNode();
-   Token t;
-   int lv = 1;
-   op.value = "program";
-   indent(lv);
-   System.out.println("(" + op.value);
+    AST tree;
 }
 {
-   t = <KEYWORD> t = <KEYWORD> t = <OPENPAREN> t = <CLOSEPAREN> 
-   r = block(lv + 1) {
-      op.left = tree;
-      op.right = r;
-      tree = op;
-      indent(lv);
-      System.out.println(")");
-   }
-   { return tree; }
+    <KEYWORD> <KEYWORD> <OPENPAREN> <CLOSEPAREN> 
+    tree = block()
+    { return tree; }
 } 
 
-/* <block> → { <declarations> <optional_statements>? } */
-ASTNode block(int n) :
+// <block> → { <declarations> <optional_statements>? }
+AST block() :
 { 
-   Token t;
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<block>");
+    AST tree = null, op, l = null, r;  
 }
 {
-   t = <BEGIN> {
-      // indent(lv);
-      // System.out.println(t.image);
-   }
-   declarations(lv + 1)
-   optional_statements(lv + 1)
-   t = <END> {
-      // indent(lv);
-      // System.out.println(t.image);
-   }
-   { return null; }
+    <BEGIN> 
+    l = declarations() // declaration tree could be null
+    (r = optional_statements() {
+        if (l != null) {
+            op = new Node("program", l, r);
+            tree = op;
+        }
+        else
+            tree = r;
+    })? 
+    <END>
+    { return tree; }
 }
 
 // <declarations>  →  (<declaration>)*
-ASTNode declarations(int n) :
+AST declarations() :
 {
-   ASTNode op = new ASTNode(); 
-   ASTNode tree = new ASTNode(); 
-   ASTNode r = new ASTNode();
-   int lv = n;
-   op.value = ";";
-   indent(lv);
-   System.out.println("(" + op.value);
+    AST tleft = null, tright = null;
 }
 {
-  (r = declaration(lv + 1) {
-      op.left = tree;
-      op.right = r;
-      tree = op;
-      indent(lv);
-      System.out.println(")");
-  })*
-  { return tree; }
+    (tright = declaration() {
+        if (tleft != null)
+            tleft = new Node(";", tleft, tright);
+        else
+            tleft = tright;
+    })*
+    { return tleft; }
 }
 
 // <declaration>  →  <type> <identifier_list>; 
-ASTNode declaration(int n) :
+AST declaration() :
 {
-  ASTNode op = new ASTNode(); 
-  ASTNode tree = new ASTNode(); 
-  ASTNode r = new ASTNode();
-  Token t;
-  int lv = n;
-  op.value = ":";
-  indent(lv);
-  System.out.println("(" + op.value);
+    Token t;
+    AST tree, l, op;
 }
 {
-  t = <TYPE> 
-  r = identifier_list(lv + 1) {
-      op.left = tree;
-      op.right = r;
-      tree = op;
-      indent(lv);
-      System.out.println(")");
-  }
-  t = <SEMICOLON>
-  { return tree; }
+    t = <TYPE> { l = new Leaf(t.image); }
+    tree = identifier_list() {
+        op = new Node(":", l, tree);
+        tree = op;
+    }
+    <SEMICOLON>
+    { return tree; }
 }
 
 // <identifier_list>  →  <id>  ( , <id> )*
-ASTNode identifier_list(int n): 
+AST identifier_list(): 
 {
-  ASTNode op = new ASTNode(); 
-  ASTNode tree = new ASTNode(); 
-  ASTNode r = new ASTNode();
-  Token t;
-  int lv = n;
+    Token t;
+    String comma;
+    AST tree, op, l, r;
 }
 {
-  t = <IDENTIFIER> (t = <COMMA> t = <IDENTIFIER>)*
-
-  { return tree; }
+    t = <IDENTIFIER> { tree = new Leaf(t.image); } 
+    (t = <COMMA> { comma = t.image; } 
+    t = <IDENTIFIER> {
+        r = new Leaf(t.image); 
+        op = new Node(comma, tree, r);
+        tree = op;
+    })*
+    { return tree; }
 }
 
 // <optional_statements>  → <statement_list>
-void optional_statements(int n) :
+AST optional_statements() :
 { 
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<optional_statements>");
+    AST tree;
 }
 {
-   statement_list(lv + 1)
+    tree = statement_list()
+    { return tree; }
 }
 
 // <statement_list>  → <statement> ( <statement> )* 
-void statement_list(int n) :
+AST statement_list() :
 {
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<statement_list>"); 
+    AST tree, op, r;
 }
 {
-   statement(lv + 1) (statement(lv + 1))*
+    tree = statement() (r = statement() {
+        op = new Node(";", tree, r);
+        tree = op;
+    })*
+    { return tree; }
 }
 
 /* <statement>  → <variable> <assignop> <expression>;
                 | <block>
                 | if (<expression>) <statement> <else_clause>
                 | while (<expression>) <statement> */
-void statement(int n) :
+AST statement() :
 {
-   Token t;
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<statement>"); 
+    Token t;
+    AST tree, op, l, r; 
+    AST r1, r2; // two possible right child for "if" op
 }
 {
-   variable(lv + 1) 
-   t = <ASSIGNOP> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   } 
-   expression(lv + 1) 
-   t = <SEMICOLON> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   |
-   block(lv + 1)
-   |
-   LOOKAHEAD(3)
-   t = <KEYWORD> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   t = <OPENPAREN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   expression(lv + 1)
-   t = <CLOSEPAREN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   statement(lv + 1)
-   else_clause(lv + 1)
-   |
-   t = <KEYWORD> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   t = <OPENPAREN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   expression(lv + 1)
-   t = <CLOSEPAREN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   statement(lv + 1)
+    tree = variable() t = <ASSIGNOP> r = expression() <SEMICOLON> {
+        op = new Node(t.image, tree, r);
+        tree = op;
+    }
+    { return tree; }
+    |
+    tree = block()
+    { return tree; }
+    |
+    LOOKAHEAD(3)
+    t = <KEYWORD> <OPENPAREN> l = expression() <CLOSEPAREN> r1 = statement() 
+    r2 = else_clause(r1) {
+        /* if the else clause is not null, attach it to the right of "if" op
+           the left child of else will be the block executing when the condition of "if" is true (r1)
+           the right child of else will be the block executing when that codition is false (r2) 
+           the else_clause() method take r1 as an argument so that r1 can be used to attach to "else" op */
+        if (r2 != null) {
+            op = new Node(t.image, l, r2);
+            tree = op;
+        }
+        // if else clause is null, the right child of "if" op is the block r1
+        else {
+            op = new Node(t.image, l, r1);
+            tree = op;
+        }
+    }
+    { return tree; }
+    |
+    // "while" op is analogous to second case of "if" op
+    t = <KEYWORD> <OPENPAREN> l = expression() <CLOSEPAREN> r1 = statement() {
+        op = new Node(t.image, l, r1);
+        tree = op;
+    }
+    { return tree; }
 }
 
 // <else_clause>  →  ( else <statement> )? 
-void else_clause(int n) :
+AST else_clause(AST left) :
 {
-  Token t;
-  int lv = n;
-  // indent(lv);
-  // System.out.println("<else_clause>");
+    Token t;
+    AST tree = null, op, r;
 }
 {
-  (LOOKAHEAD(2)
-  t = <KEYWORD> {
-    // indent(lv + 1);
-    // System.out.println(t.image);
-  }
-  statement(lv + 1))?
+    (LOOKAHEAD(2)
+    t = <KEYWORD> r = statement() {
+        op = new Node(t.image, left, r); // attach r1 (above) to the left of "else" op
+        tree = op;
+    })?
+    { return tree; }
 }
 
 // <variable> → <id> 
-void variable(int n) : 
+AST variable() : 
 { 
-   Token t;
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<variable>");
+    Token t;
 }
 {
-   t = <IDENTIFIER> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
+    t = <IDENTIFIER> { return new Leaf(t.image); }
 }
 
 // <expression> -> <simple_expression> <relopclause>
-void expression(int n) :
+AST expression() :
 {
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<expression>"); 
+    AST tree, op, r;
 }
 {
-   simple_expression(lv + 1)
-   relopclause(lv + 1)
+    tree = simple_expression() r = relopclause(tree) {
+        if (r != null) tree = r;
+    }
+    { return tree; }
 }
 
-// <relopclause> -> <relop> <simple_expression> | ε ([<relop> <simple_expression>]) 
-void relopclause(int n) :
+// <relopclause> -> <relop> <simple_expression> | ε  
+AST relopclause(AST left) :
 {
-   Token t;
-   int lv = n;
-   // indent(lv);
-   // System.out.println("<relopclause>");
+    Token t;
+    AST tree = null, op;
 }
 {
-   [t = <RELOP> {
-      indent(lv + 1);
-      System.out.println(t.image);
-    }
-    simple_expression(lv + 1)]
+   [t = <RELOP> tree = simple_expression() {
+      op = new Node(t.image, left, tree);
+      tree = op;
+   }]
+   { return tree; }
 }
 
 
 /* <simple_expression>  → <term> ( <addop> <term> ) * 
                         | <sign> <term> */
-void simple_expression(int n) :
+AST simple_expression() :
 { 
-   Token t;
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<simple_expression>");
+    Token t;
+    AST tree, op, r;
 }
 {
-   term(lv + 1)
-   (t = <ADDOP> {
-       // indent(lv + 1);
-       // System.out.println(t.image);
-    } 
-    term(lv + 1)
-   )*
-   |
-   t = <SIGN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   term(lv + 1)
+    tree = term() (t = <ADDOP> r = term() {
+        op = new Node(t.image, tree, r);
+        tree = op;
+    })*
+    { return tree; }
+    |
+    <SIGN> tree = term() // skip for now
+    { return null; }
 }
 
 // <term> →   <factor> (<mulop> <factor>) * 
-void term(int n) :
+AST term() :
 {
-   Token t;
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<term>"); 
+    Token t;
+    AST tree, op, r;
 }
 {
-   factor(lv + 1) 
-   (t = <MULTOP> {
-       // indent(lv + 1);
-       // System.out.println(t.image);
-    } 
-    factor(lv + 1)
-   )*
+    tree = factor() (t = <MULTOP> r = factor() {
+        op = new Node(t.image, tree, r);
+        tree = op;
+    })*
+    { return tree; }
 }
 
 // <factor>  → <id> |  (<expression>) |  <num> | !<factor>
-void factor(int n) :
+AST factor() :
 {
-   Token t;
-   int lv = n; 
-   // indent(lv);
-   // System.out.println("<factor>");
+    Token t;
+    AST tree, op;
 }
 {
-   t = <IDENTIFIER> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   | 
-   t = <OPENPAREN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   expression(lv + 1) 
-   t = <CLOSEPAREN> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   | 
-   t = <DIGIT> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   |
-   t = <NOT> {
-      // indent(lv + 1);
-      // System.out.println(t.image);
-   }
-   factor(lv + 1)
+    t = <IDENTIFIER> { return new Leaf(t.image); }
+    | 
+    <OPENPAREN> tree = expression() <CLOSEPAREN>
+    { return tree; }
+    | 
+    t = <DIGIT> { return new Leaf(t.image); }
+    |
+    t = <NOT> tree = factor() {
+        op = new Node(t.image, null, tree);
+        tree = op;
+    }
+    { return tree; }
 }
 
-/* END: Specification of Language */
+/* END: Specification of language */
