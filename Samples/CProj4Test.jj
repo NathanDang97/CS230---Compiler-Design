@@ -17,8 +17,9 @@
 
  /*
     What this file does: after receiving this file, javacc will produce a .java file (Parser.java)
-    which not only prints tokens but also prints out each successful reduction. The grammatical symbols
-    are nicely indented so that the structure of the parse tree is evident in the output 
+    which will build an Abstract Syntax Tree (AST) based on the given grammar. The Parser.java file 
+    will also print the tree with nice indentation and easy to read. Finally, the Parser will return
+    the AST instead of "void" as a preliminary for the last part of the project, the code generator
  */
 
 PARSER_BEGIN(Parser)
@@ -32,6 +33,7 @@ public class Parser {
       parser.Input();
    }
 
+   // indentation
    public static void indent(int n) {
       for (int i = 0; i < n; ++i) {
          System.out.print(" ");
@@ -40,6 +42,7 @@ public class Parser {
       }
    }
 
+    // print the tree
     public static void toString(AST t, int level) {
         // if its left/right leaf is null, print "-"
         if (t == null) {
@@ -108,6 +111,7 @@ PARSER_END(Parser)
     | <NOT: "!">
  }
 
+// return the AST after parsing the input file
 AST Input() :
 { 
     AST tree = null; 
@@ -127,42 +131,33 @@ AST Input() :
 /* 
 BEGIN: Specification of language
   - Recursive decent is applied.  
-  - Printing actions are embedded so that token and parse info is printed as it goes.
-  - Each rule of the grammar is attached as a comment line before each corresponding function for easy reading.
-  - Each function, starting from block(), will have an integer argument, say 'n', which indicates the "level/"depth" of that rule
-  in the grammar, that is, n will increase by 1 when it goes one level deeper. This will help give the correct indentation for the output since the indent(int n) method will produce the spaces based on 'n'.
+  - The AST will be built during recursive decent
+  - The empty child (if there is any) will be printed as "-"
 */
 
 // <program> → void main () <block>
 AST program() :
 { 
-    AST tree, op, l, r;
+    AST tree, op, l = null;
 }
 {
-    <KEYWORD> <KEYWORD> <OPENPAREN> <CLOSEPAREN> 
-    tree = block()
+    <KEYWORD> <KEYWORD> <OPENPAREN> <CLOSEPAREN>
+    l = declarations()
+    tree = block() {
+        op = new Node("program", l, tree);
+        tree = op;
+    }
     { return tree; }
 } 
 
 // <block> → { <declarations> <optional_statements>? }
 AST block() :
 { 
-    AST tree = null, op, l = null, r;  
+    AST tree = null;  
 }
 {
     <BEGIN> 
-    l = declarations() 
-    (r = optional_statements() {
-        if (l != null) {
-            op = new Node("program", l, r);
-            tree = op;
-        }
-        else {
-            tree = r;
-            op = new Node("program", null, tree);
-            tree = op;
-        }
-    })? 
+    (tree = optional_statements())? 
     <END>
     { return tree; }
 }
@@ -246,7 +241,8 @@ AST statement_list() :
 AST statement() :
 {
     Token t;
-    AST tree, op, l, r, r1, r2;
+    AST tree, op, l, r; 
+    AST r1, r2; // two possible right child for "if" op
 }
 {
     tree = variable() t = <ASSIGNOP> r = expression() <SEMICOLON> {
@@ -261,10 +257,15 @@ AST statement() :
     LOOKAHEAD(3)
     t = <KEYWORD> <OPENPAREN> l = expression() <CLOSEPAREN> r1 = statement() 
     r2 = else_clause(r1) {
+        /* if the else clause is not null, attach it to the right of "if" op
+           the left child of else will be the block executing when the condition of "if" is true (r1)
+           the right child of else will be the block executing when that codition is false (r2) 
+           the else_clause() method take r1 as an argument so that r1 can be used to attach to "else" op */
         if (r2 != null) {
             op = new Node(t.image, l, r2);
             tree = op;
         }
+        // if else clause is null, the right child of "if" op is the block r1
         else {
             op = new Node(t.image, l, r1);
             tree = op;
@@ -272,6 +273,7 @@ AST statement() :
     }
     { return tree; }
     |
+    // "while" op is analogous to second case of "if" op
     t = <KEYWORD> <OPENPAREN> l = expression() <CLOSEPAREN> r1 = statement() {
         op = new Node(t.image, l, r1);
         tree = op;
@@ -288,7 +290,7 @@ AST else_clause(AST left) :
 {
     (LOOKAHEAD(2)
     t = <KEYWORD> r = statement() {
-        op = new Node(t.image, left, r);
+        op = new Node(t.image, left, r); // attach r1 (above) to the left of "else" op
         tree = op;
     })?
     { return tree; }
@@ -344,7 +346,7 @@ AST simple_expression() :
     })*
     { return tree; }
     |
-    <SIGN> tree = term()
+    <SIGN> tree = term() // skip for now
     { return null; }
 }
 

@@ -49,33 +49,34 @@ public class Parser implements ParserConstants {
 BEGIN: Specification of language
   - Recursive decent is applied.  
   - The AST will be built during recursive decent
-  - The empty child (if there is any) will be printed as "-"
+  - Each operator should have 2 children except for "block" and "!" which can have one child
+  - The empty child will be printed as "-"
 */
 
 // <program> → void main () <block>
   static final public AST program() throws ParseException {
-    AST tree, op, l = null;
+    AST tree;
     jj_consume_token(KEYWORD);
     jj_consume_token(KEYWORD);
     jj_consume_token(OPENPAREN);
     jj_consume_token(CLOSEPAREN);
-    l = declarations();
     tree = block();
-        op = new Node("program", l, tree);
-        tree = op;
       {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
 
 // <block> → { <declarations> <optional_statements>? }
   static final public AST block() throws ParseException {
-    AST tree = null;
+    AST tree = null, op, l = null, r;
     jj_consume_token(BEGIN);
+    l = declarations();
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
     case KEYWORD:
     case BEGIN:
     case IDENTIFIER:
-      tree = optional_statements();
+      r = optional_statements();
+        op = new Node("block", l, r);
+        tree = op;
       break;
     default:
       jj_la1[0] = jj_gen;
@@ -277,8 +278,10 @@ BEGIN: Specification of language
 
 // <expression> -> <simple_expression> <relopclause>
   static final public AST expression() throws ParseException {
-    AST tree, op, r;
-    tree = simple_expression();
+    AST tree, r;
+    /* if there exists a relop-clause, the simple expression to the left of relop will be passed to
+        relopclause method so that it can attach that simple expression as its left child. */
+        tree = simple_expression();
     r = relopclause(tree);
         if (r != null) tree = r;
       {if (true) return tree;}
@@ -293,14 +296,17 @@ BEGIN: Specification of language
     case RELOP:
       t = jj_consume_token(RELOP);
       tree = simple_expression();
-      op = new Node(t.image, left, tree);
-      tree = op;
+        /* create a new node with the value is the relop, the left child is the simple
+        expression from the expression() method above and the right child is the other
+        simple expression in the rule */
+        op = new Node(t.image, left, tree);
+        tree = op;
       break;
     default:
       jj_la1[6] = jj_gen;
       ;
     }
-     {if (true) return tree;}
+      {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
 
@@ -417,13 +423,18 @@ BEGIN: Specification of language
     finally { jj_save(1, xla); }
   }
 
+  static private boolean jj_3R_16() {
+    if (jj_3R_17()) return true;
+    return false;
+  }
+
   static private boolean jj_3R_6() {
     if (jj_3R_8()) return true;
     return false;
   }
 
-  static private boolean jj_3R_16() {
-    if (jj_3R_17()) return true;
+  static private boolean jj_3R_13() {
+    if (jj_scan_token(SIGN)) return true;
     return false;
   }
 
@@ -439,18 +450,8 @@ BEGIN: Specification of language
     return false;
   }
 
-  static private boolean jj_3R_13() {
-    if (jj_scan_token(SIGN)) return true;
-    return false;
-  }
-
   static private boolean jj_3R_10() {
     if (jj_3R_15()) return true;
-    return false;
-  }
-
-  static private boolean jj_3R_15() {
-    if (jj_scan_token(BEGIN)) return true;
     return false;
   }
 
@@ -466,6 +467,11 @@ BEGIN: Specification of language
 
   static private boolean jj_3R_12() {
     if (jj_3R_16()) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_15() {
+    if (jj_scan_token(BEGIN)) return true;
     return false;
   }
 
@@ -490,14 +496,14 @@ BEGIN: Specification of language
     return false;
   }
 
-  static private boolean jj_3_2() {
-    if (jj_scan_token(KEYWORD)) return true;
-    if (jj_3R_7()) return true;
+  static private boolean jj_3R_21() {
+    if (jj_scan_token(NOT)) return true;
     return false;
   }
 
-  static private boolean jj_3R_21() {
-    if (jj_scan_token(NOT)) return true;
+  static private boolean jj_3_2() {
+    if (jj_scan_token(KEYWORD)) return true;
+    if (jj_3R_7()) return true;
     return false;
   }
 

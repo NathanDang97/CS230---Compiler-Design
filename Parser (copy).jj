@@ -132,7 +132,7 @@ AST Input() :
 BEGIN: Specification of language
   - Recursive decent is applied.  
   - The AST will be built during recursive decent
-  - Each operator should have 2 children except for "block" and "!" which can have one child
+  - Each operator should have 2 children except for "program" and "!" which can have one child
   - The empty child will be printed as "-"
 */
 
@@ -156,8 +156,12 @@ AST block() :
     <BEGIN> 
     l = declarations() // declaration tree could be null
     (r = optional_statements() {
-        op = new Node("block", l, r);
-        tree = op;
+        if (l != null) {
+            op = new Node("program", l, r);
+            tree = op;
+        }
+        else
+            tree = r;
     })? 
     <END>
     { return tree; }
@@ -309,11 +313,9 @@ AST variable() :
 // <expression> -> <simple_expression> <relopclause>
 AST expression() :
 {
-    AST tree, r;
+    AST tree, op, r;
 }
 {
-    /* if there exists a relop-clause, the simple expression to the left of relop will be passed to
-    relopclause method so that it can attach that simple expression as its left child. */
     tree = simple_expression() r = relopclause(tree) {
         if (r != null) tree = r;
     }
@@ -327,14 +329,11 @@ AST relopclause(AST left) :
     AST tree = null, op;
 }
 {
-    [t = <RELOP> tree = simple_expression() {
-        /* create a new node with the value is the relop, the left child is the simple
-        expression from the expression() method above and the right child is the other
-        simple expression in the rule */
-        op = new Node(t.image, left, tree); 
-        tree = op;
-    }]
-    { return tree; }
+   [t = <RELOP> tree = simple_expression() {
+      op = new Node(t.image, left, tree);
+      tree = op;
+   }]
+   { return tree; }
 }
 
 
@@ -391,10 +390,4 @@ AST factor() :
     { return tree; }
 }
 
-/* END: Specification of language 
-   For testing:
-   - input0.txt: sample code given in part 1 (has assignment statements only)
-   - input1,2.txt: sample codes given in part 3
-   - input3,4.txt: sample codes I wrote
-   - input5.txt: sample code given in part 4
-*/
+/* END: Specification of language */

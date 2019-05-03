@@ -2,13 +2,13 @@ void main()
 {
    int a, b;
    int c;
+   bool done;
+   int d, e;
    
    if (a > b)
       c = a + b;
    else if (a == b) {
-	bool done;
-   	int d, e; 
-   	while (!done) {  		
+   	while (!done) {   		
    	    d = a + a + b;
    	    e = a - b - b;
          if (d == e)

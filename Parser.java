@@ -3,87 +3,93 @@ import java.io.*;
 import java.util.*;
 
 public class Parser implements ParserConstants {
-   public static class ASTNode {
-      String value;
-      ASTNode left;
-      ASTNode right;
-   }
    public static void main(String[] args) throws ParseException, FileNotFoundException {
       Parser parser = new Parser(new FileInputStream(args[0]));
       parser.Input();
    }
 
+   // indentation
    public static void indent(int n) {
       for (int i = 0; i < n; ++i) {
+         System.out.print(" ");
          System.out.print(" ");
          System.out.print(" ");
       }
    }
 
-/* END: Specification of tokens */
+    // print the tree
+    public static void toString(AST t, int level) {
+        // if its left/right leaf is null, print "-"
+        if (t == null) {
+            indent(level);
+            System.out.println("-");
+            return;
+        }
+        indent(level);
+        System.out.println(t.value);
+        // if it's a leaf, return
+        if (t.left == null && t.right == null) return;
+        toString(t.left, level + 1);
+        toString(t.right, level + 1);
+    }
+
+// return the AST after parsing the input file
+  static final public AST Input() throws ParseException {
+    AST tree = null;
+      System.out.println("Parsing the input file...");
+      System.out.println("-------------------------");
+    tree = program();
+    jj_consume_token(0);
+      toString(tree, 1);
+      {if (true) return tree;}
+    throw new Error("Missing return statement in function");
+  }
 
 /* 
 BEGIN: Specification of language
   - Recursive decent is applied.  
-  - Printing actions are embedded so that token and parse info is printed as it goes.
-  - Each rule of the grammar is attached as a comment line before each corresponding function for easy reading.
-  - Each function, starting from block(), will have an integer argument, say 'n', which indicates the "level/"depth" of that rule
-  in the grammar, that is, n will increase by 1 when it goes one level deeper. This will help give the correct indentation for the output since the indent(int n) method will produce the spaces based on 'n'.
+  - The AST will be built during recursive decent
+  - Each operator should have 2 children except for "program" and "!" which can have one child
+  - The empty child will be printed as "-"
 */
-  static final public void Input() throws ParseException {
-      System.out.println("Parsing the input file...");
-      System.out.println("-------------------------");
-    program();
-    jj_consume_token(0);
-  }
 
 // <program> → void main () <block>
-  static final public ASTNode program() throws ParseException {
-   ASTNode op = new ASTNode();
-   ASTNode tree = new ASTNode();
-   ASTNode r = new ASTNode();
-   Token t;
-   int lv = 1;
-   op.value = "program";
-   indent(lv);
-   System.out.println("(" + op.value);
-    t = jj_consume_token(KEYWORD);
-    t = jj_consume_token(KEYWORD);
-    t = jj_consume_token(OPENPAREN);
-    t = jj_consume_token(CLOSEPAREN);
-    r = block(lv + 1);
-      op.left = tree;
-      op.right = r;
-      tree = op;
-      indent(lv);
-      System.out.println(")");
-     {if (true) return tree;}
+  static final public AST program() throws ParseException {
+    AST tree;
+    jj_consume_token(KEYWORD);
+    jj_consume_token(KEYWORD);
+    jj_consume_token(OPENPAREN);
+    jj_consume_token(CLOSEPAREN);
+    tree = block();
+      {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
 
-/* <block> → { <declarations> <optional_statements>? } */
-  static final public ASTNode block(int n) throws ParseException {
-   Token t;
-   int lv = n;
-    t = jj_consume_token(BEGIN);
-
-    declarations(lv + 1);
-    optional_statements(lv + 1);
-    t = jj_consume_token(END);
-
-     {if (true) return null;}
+// <block> → { <declarations> <optional_statements>? }
+  static final public AST block() throws ParseException {
+    AST tree = null, op, l = null, r;
+    jj_consume_token(BEGIN);
+    l = declarations();
+    switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
+    case KEYWORD:
+    case BEGIN:
+    case IDENTIFIER:
+      r = optional_statements();
+        op = new Node("block", l, r);
+        tree = op;
+      break;
+    default:
+      jj_la1[0] = jj_gen;
+      ;
+    }
+    jj_consume_token(END);
+      {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
 
 // <declarations>  →  (<declaration>)*
-  static final public ASTNode declarations(int n) throws ParseException {
-   ASTNode op = new ASTNode();
-   ASTNode tree = new ASTNode();
-   ASTNode r = new ASTNode();
-   int lv = n;
-   op.value = ";";
-   indent(lv);
-   System.out.println("(" + op.value);
+  static final public AST declarations() throws ParseException {
+    AST tleft = null, tright = null;
     label_1:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
@@ -91,50 +97,40 @@ BEGIN: Specification of language
         ;
         break;
       default:
-        jj_la1[0] = jj_gen;
+        jj_la1[1] = jj_gen;
         break label_1;
       }
-      r = declaration(lv + 1);
-      op.left = tree;
-      op.right = r;
-      tree = op;
-      indent(lv);
-      System.out.println(")");
+      tright = declaration();
+        if (tleft != null)
+            tleft = new Node(";", tleft, tright);
+        else
+            tleft = tright;
     }
-    {if (true) return tree;}
+      {if (true) return tleft;}
     throw new Error("Missing return statement in function");
   }
 
 // <declaration>  →  <type> <identifier_list>; 
-  static final public ASTNode declaration(int n) throws ParseException {
-  ASTNode op = new ASTNode();
-  ASTNode tree = new ASTNode();
-  ASTNode r = new ASTNode();
-  Token t;
-  int lv = n;
-  op.value = ":";
-  indent(lv);
-  System.out.println("(" + op.value);
+  static final public AST declaration() throws ParseException {
+    Token t;
+    AST tree, l, op;
     t = jj_consume_token(TYPE);
-    r = identifier_list(lv + 1);
-      op.left = tree;
-      op.right = r;
-      tree = op;
-      indent(lv);
-      System.out.println(")");
-    t = jj_consume_token(SEMICOLON);
-    {if (true) return tree;}
+                 l = new Leaf(t.image);
+    tree = identifier_list();
+        op = new Node(":", l, tree);
+        tree = op;
+    jj_consume_token(SEMICOLON);
+      {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
 
 // <identifier_list>  →  <id>  ( , <id> )*
-  static final public ASTNode identifier_list(int n) throws ParseException {
-  ASTNode op = new ASTNode();
-  ASTNode tree = new ASTNode();
-  ASTNode r = new ASTNode();
-  Token t;
-  int lv = n;
+  static final public AST identifier_list() throws ParseException {
+    Token t;
+    String comma;
+    AST tree, op, l, r;
     t = jj_consume_token(IDENTIFIER);
+                       tree = new Leaf(t.image);
     label_2:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
@@ -142,26 +138,32 @@ BEGIN: Specification of language
         ;
         break;
       default:
-        jj_la1[1] = jj_gen;
+        jj_la1[2] = jj_gen;
         break label_2;
       }
       t = jj_consume_token(COMMA);
+                   comma = t.image;
       t = jj_consume_token(IDENTIFIER);
+        r = new Leaf(t.image);
+        op = new Node(comma, tree, r);
+        tree = op;
     }
-    {if (true) return tree;}
+      {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
 
 // <optional_statements>  → <statement_list>
-  static final public void optional_statements(int n) throws ParseException {
-   int lv = n;
-    statement_list(lv + 1);
+  static final public AST optional_statements() throws ParseException {
+    AST tree;
+    tree = statement_list();
+      {if (true) return tree;}
+    throw new Error("Missing return statement in function");
   }
 
 // <statement_list>  → <statement> ( <statement> )* 
-  static final public void statement_list(int n) throws ParseException {
-   int lv = n;
-    statement(lv + 1);
+  static final public AST statement_list() throws ParseException {
+    AST tree, op, r;
+    tree = statement();
     label_3:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
@@ -171,121 +173,149 @@ BEGIN: Specification of language
         ;
         break;
       default:
-        jj_la1[2] = jj_gen;
+        jj_la1[3] = jj_gen;
         break label_3;
       }
-      statement(lv + 1);
+      r = statement();
+        op = new Node(";", tree, r);
+        tree = op;
     }
+      {if (true) return tree;}
+    throw new Error("Missing return statement in function");
   }
 
 /* <statement>  → <variable> <assignop> <expression>;
                 | <block>
                 | if (<expression>) <statement> <else_clause>
                 | while (<expression>) <statement> */
-  static final public void statement(int n) throws ParseException {
-   Token t;
-   int lv = n;
+  static final public AST statement() throws ParseException {
+    Token t;
+    AST tree, op, l, r;
+    AST r1, r2;
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
     case IDENTIFIER:
-      variable(lv + 1);
+      tree = variable();
       t = jj_consume_token(ASSIGNOP);
-
-      expression(lv + 1);
-      t = jj_consume_token(SEMICOLON);
-
+      r = expression();
+      jj_consume_token(SEMICOLON);
+        op = new Node(t.image, tree, r);
+        tree = op;
+      {if (true) return tree;}
       break;
     case BEGIN:
-      block(lv + 1);
+      tree = block();
+      {if (true) return tree;}
       break;
     default:
-      jj_la1[3] = jj_gen;
+      jj_la1[4] = jj_gen;
       if (jj_2_1(3)) {
         t = jj_consume_token(KEYWORD);
-
-        t = jj_consume_token(OPENPAREN);
-
-        expression(lv + 1);
-        t = jj_consume_token(CLOSEPAREN);
-
-        statement(lv + 1);
-        else_clause(lv + 1);
+        jj_consume_token(OPENPAREN);
+        l = expression();
+        jj_consume_token(CLOSEPAREN);
+        r1 = statement();
+        r2 = else_clause(r1);
+        /* if the else clause is not null, attach it to the right of "if" op
+           the left child of else will be the block executing when the condition of "if" is true (r1)
+           the right child of else will be the block executing when that codition is false (r2) 
+           the else_clause() method take r1 as an argument so that r1 can be used to attach to "else" op */
+        if (r2 != null) {
+            op = new Node(t.image, l, r2);
+            tree = op;
+        }
+        // if else clause is null, the right child of "if" op is the block r1
+        else {
+            op = new Node(t.image, l, r1);
+            tree = op;
+        }
+      {if (true) return tree;}
       } else {
         switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
         case KEYWORD:
-          t = jj_consume_token(KEYWORD);
-
-          t = jj_consume_token(OPENPAREN);
-
-          expression(lv + 1);
-          t = jj_consume_token(CLOSEPAREN);
-
-          statement(lv + 1);
+          // "while" op is analogous to second case of "if" op
+              t = jj_consume_token(KEYWORD);
+          jj_consume_token(OPENPAREN);
+          l = expression();
+          jj_consume_token(CLOSEPAREN);
+          r1 = statement();
+        op = new Node(t.image, l, r1);
+        tree = op;
+      {if (true) return tree;}
           break;
         default:
-          jj_la1[4] = jj_gen;
+          jj_la1[5] = jj_gen;
           jj_consume_token(-1);
           throw new ParseException();
         }
       }
     }
+    throw new Error("Missing return statement in function");
   }
 
 // <else_clause>  →  ( else <statement> )? 
-  static final public void else_clause(int n) throws ParseException {
-  Token t;
-  int lv = n;
+  static final public AST else_clause(AST left) throws ParseException {
+    Token t;
+    AST tree = null, op, r;
     if (jj_2_2(2)) {
       t = jj_consume_token(KEYWORD);
-
-      statement(lv + 1);
+      r = statement();
+        op = new Node(t.image, left, r); // attach r1 (above) to the left of "else" op
+        tree = op;
     } else {
       ;
     }
+      {if (true) return tree;}
+    throw new Error("Missing return statement in function");
   }
 
 // <variable> → <id> 
-  static final public void variable(int n) throws ParseException {
-   Token t;
-   int lv = n;
+  static final public AST variable() throws ParseException {
+    Token t;
     t = jj_consume_token(IDENTIFIER);
-
+                       {if (true) return new Leaf(t.image);}
+    throw new Error("Missing return statement in function");
   }
 
 // <expression> -> <simple_expression> <relopclause>
-  static final public void expression(int n) throws ParseException {
-   int lv = n;
-    simple_expression(lv + 1);
-    relopclause(lv + 1);
+  static final public AST expression() throws ParseException {
+    AST tree, op, r;
+    tree = simple_expression();
+    r = relopclause(tree);
+        if (r != null) tree = r;
+      {if (true) return tree;}
+    throw new Error("Missing return statement in function");
   }
 
-// <relopclause> -> <relop> <simple_expression> | ε ([<relop> <simple_expression>]) 
-  static final public void relopclause(int n) throws ParseException {
-   Token t;
-   int lv = n;
+// <relopclause> -> <relop> <simple_expression> | ε  
+  static final public AST relopclause(AST left) throws ParseException {
+    Token t;
+    AST tree = null, op;
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
     case RELOP:
       t = jj_consume_token(RELOP);
-      indent(lv + 1);
-      System.out.println(t.image);
-      simple_expression(lv + 1);
+      tree = simple_expression();
+      op = new Node(t.image, left, tree);
+      tree = op;
       break;
     default:
-      jj_la1[5] = jj_gen;
+      jj_la1[6] = jj_gen;
       ;
     }
+     {if (true) return tree;}
+    throw new Error("Missing return statement in function");
   }
 
 /* <simple_expression>  → <term> ( <addop> <term> ) * 
                         | <sign> <term> */
-  static final public void simple_expression(int n) throws ParseException {
-   Token t;
-   int lv = n;
+  static final public AST simple_expression() throws ParseException {
+    Token t;
+    AST tree, op, r;
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
     case OPENPAREN:
     case IDENTIFIER:
     case DIGIT:
     case NOT:
-      term(lv + 1);
+      tree = term();
       label_4:
       while (true) {
         switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
@@ -293,31 +323,34 @@ BEGIN: Specification of language
           ;
           break;
         default:
-          jj_la1[6] = jj_gen;
+          jj_la1[7] = jj_gen;
           break label_4;
         }
         t = jj_consume_token(ADDOP);
-
-        term(lv + 1);
+        r = term();
+        op = new Node(t.image, tree, r);
+        tree = op;
       }
+      {if (true) return tree;}
       break;
     case SIGN:
-      t = jj_consume_token(SIGN);
-
-      term(lv + 1);
+      jj_consume_token(SIGN);
+      tree = term();
+      {if (true) return null;}
       break;
     default:
-      jj_la1[7] = jj_gen;
+      jj_la1[8] = jj_gen;
       jj_consume_token(-1);
       throw new ParseException();
     }
+    throw new Error("Missing return statement in function");
   }
 
 // <term> →   <factor> (<mulop> <factor>) * 
-  static final public void term(int n) throws ParseException {
-   Token t;
-   int lv = n;
-    factor(lv + 1);
+  static final public AST term() throws ParseException {
+    Token t;
+    AST tree, op, r;
+    tree = factor();
     label_5:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
@@ -325,45 +358,50 @@ BEGIN: Specification of language
         ;
         break;
       default:
-        jj_la1[8] = jj_gen;
+        jj_la1[9] = jj_gen;
         break label_5;
       }
       t = jj_consume_token(MULTOP);
-
-      factor(lv + 1);
+      r = factor();
+        op = new Node(t.image, tree, r);
+        tree = op;
     }
+      {if (true) return tree;}
+    throw new Error("Missing return statement in function");
   }
 
 // <factor>  → <id> |  (<expression>) |  <num> | !<factor>
-  static final public void factor(int n) throws ParseException {
-   Token t;
-   int lv = n;
+  static final public AST factor() throws ParseException {
+    Token t;
+    AST tree, op;
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
     case IDENTIFIER:
       t = jj_consume_token(IDENTIFIER);
-
+                       {if (true) return new Leaf(t.image);}
       break;
     case OPENPAREN:
-      t = jj_consume_token(OPENPAREN);
-
-      expression(lv + 1);
-      t = jj_consume_token(CLOSEPAREN);
-
+      jj_consume_token(OPENPAREN);
+      tree = expression();
+      jj_consume_token(CLOSEPAREN);
+      {if (true) return tree;}
       break;
     case DIGIT:
       t = jj_consume_token(DIGIT);
-
+                  {if (true) return new Leaf(t.image);}
       break;
     case NOT:
       t = jj_consume_token(NOT);
-
-      factor(lv + 1);
+      tree = factor();
+        op = new Node(t.image, null, tree);
+        tree = op;
+      {if (true) return tree;}
       break;
     default:
-      jj_la1[9] = jj_gen;
+      jj_la1[10] = jj_gen;
       jj_consume_token(-1);
       throw new ParseException();
     }
+    throw new Error("Missing return statement in function");
   }
 
   static private boolean jj_2_1(int xla) {
@@ -380,13 +418,13 @@ BEGIN: Specification of language
     finally { jj_save(1, xla); }
   }
 
-  static private boolean jj_3R_13() {
-    if (jj_scan_token(SIGN)) return true;
+  static private boolean jj_3R_6() {
+    if (jj_3R_8()) return true;
     return false;
   }
 
-  static private boolean jj_3R_11() {
-    if (jj_scan_token(KEYWORD)) return true;
+  static private boolean jj_3R_16() {
+    if (jj_3R_17()) return true;
     return false;
   }
 
@@ -395,8 +433,25 @@ BEGIN: Specification of language
     return false;
   }
 
-  static private boolean jj_3R_19() {
+  static private boolean jj_3_1() {
+    if (jj_scan_token(KEYWORD)) return true;
     if (jj_scan_token(OPENPAREN)) return true;
+    if (jj_3R_6()) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_13() {
+    if (jj_scan_token(SIGN)) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_10() {
+    if (jj_3R_15()) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_15() {
+    if (jj_scan_token(BEGIN)) return true;
     return false;
   }
 
@@ -412,50 +467,6 @@ BEGIN: Specification of language
 
   static private boolean jj_3R_12() {
     if (jj_3R_16()) return true;
-    return false;
-  }
-
-  static private boolean jj_3R_17() {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_18()) {
-    jj_scanpos = xsp;
-    if (jj_3R_19()) {
-    jj_scanpos = xsp;
-    if (jj_3R_20()) {
-    jj_scanpos = xsp;
-    if (jj_3R_21()) return true;
-    }
-    }
-    }
-    return false;
-  }
-
-  static private boolean jj_3R_18() {
-    if (jj_scan_token(IDENTIFIER)) return true;
-    return false;
-  }
-
-  static private boolean jj_3_1() {
-    if (jj_scan_token(KEYWORD)) return true;
-    if (jj_scan_token(OPENPAREN)) return true;
-    if (jj_3R_6()) return true;
-    return false;
-  }
-
-  static private boolean jj_3R_10() {
-    if (jj_3R_15()) return true;
-    return false;
-  }
-
-  static private boolean jj_3_2() {
-    if (jj_scan_token(KEYWORD)) return true;
-    if (jj_3R_7()) return true;
-    return false;
-  }
-
-  static private boolean jj_3R_16() {
-    if (jj_3R_17()) return true;
     return false;
   }
 
@@ -480,8 +491,9 @@ BEGIN: Specification of language
     return false;
   }
 
-  static private boolean jj_3R_6() {
-    if (jj_3R_8()) return true;
+  static private boolean jj_3_2() {
+    if (jj_scan_token(KEYWORD)) return true;
+    if (jj_3R_7()) return true;
     return false;
   }
 
@@ -495,8 +507,34 @@ BEGIN: Specification of language
     return false;
   }
 
-  static private boolean jj_3R_15() {
-    if (jj_scan_token(BEGIN)) return true;
+  static private boolean jj_3R_19() {
+    if (jj_scan_token(OPENPAREN)) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_17() {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_18()) {
+    jj_scanpos = xsp;
+    if (jj_3R_19()) {
+    jj_scanpos = xsp;
+    if (jj_3R_20()) {
+    jj_scanpos = xsp;
+    if (jj_3R_21()) return true;
+    }
+    }
+    }
+    return false;
+  }
+
+  static private boolean jj_3R_18() {
+    if (jj_scan_token(IDENTIFIER)) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_11() {
+    if (jj_scan_token(KEYWORD)) return true;
     return false;
   }
 
@@ -512,13 +550,13 @@ BEGIN: Specification of language
   static private Token jj_scanpos, jj_lastpos;
   static private int jj_la;
   static private int jj_gen;
-  static final private int[] jj_la1 = new int[10];
+  static final private int[] jj_la1 = new int[11];
   static private int[] jj_la1_0;
   static {
       jj_la1_init_0();
    }
    private static void jj_la1_init_0() {
-      jj_la1_0 = new int[] {0x40,0x100000,0x14020,0x14000,0x20,0x80,0x100,0x2d1000,0x200,0x251000,};
+      jj_la1_0 = new int[] {0x28020,0x40,0x100000,0x28020,0x28000,0x20,0x80,0x100,0x2a2200,0x400,0x2a2000,};
    }
   static final private JJCalls[] jj_2_rtns = new JJCalls[2];
   static private boolean jj_rescan = false;
@@ -542,7 +580,7 @@ BEGIN: Specification of language
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 10; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -557,7 +595,7 @@ BEGIN: Specification of language
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 10; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -575,7 +613,7 @@ BEGIN: Specification of language
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 10; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -586,7 +624,7 @@ BEGIN: Specification of language
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 10; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -603,7 +641,7 @@ BEGIN: Specification of language
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 10; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -613,7 +651,7 @@ BEGIN: Specification of language
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 10; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -733,7 +771,7 @@ BEGIN: Specification of language
       la1tokens[jj_kind] = true;
       jj_kind = -1;
     }
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 11; i++) {
       if (jj_la1[i] == jj_gen) {
         for (int j = 0; j < 32; j++) {
           if ((jj_la1_0[i] & (1<<j)) != 0) {
@@ -803,4 +841,23 @@ BEGIN: Specification of language
     JJCalls next;
   }
 
+}
+
+abstract class AST {
+    String value;
+    AST left, right;
+}
+class Leaf extends AST {
+    Leaf(String val) {
+        this.value = val;
+        this.left = null;
+        this.right = null;
+    }
+}
+class Node extends AST {
+    Node(String val, AST l, AST r) {
+        this.value = val;
+        this.left = l;
+        this.right = r;
+    }
 }

@@ -17,12 +17,12 @@ void main()
       }
       else {
          if (p < q) {
-            p = p + -2;
+            p = p + 2;
             q = q - 2;
          }
          else {
-            p = -p;
-            q = -q;
+            p = p - 2;
+            q = q + 2;
          }
       }
       if (m == n)
