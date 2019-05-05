@@ -30,7 +30,10 @@ import java.util.*;
 public class Parser {
    public static void main(String[] args) throws ParseException, FileNotFoundException {
       Parser parser = new Parser(new FileInputStream(args[0]));
-      parser.Input();
+      AST tree = parser.Input();
+      System.out.println("Parsing the input file..."); 
+      System.out.println("-------------------------");
+      toString(tree, 1);
    }
 
    // indentation
@@ -117,13 +120,8 @@ AST Input() :
     AST tree = null; 
 }
 {
-   { 
-      System.out.println("Parsing the input file..."); 
-      System.out.println("-------------------------");
-   }
    tree = program() <EOF>
    {
-      toString(tree, 1);
       return tree;
    }
 }
@@ -238,10 +236,12 @@ AST statement_list() :
 /* <statement>  → <variable> <assignop> <expression>;
                 | <block>
                 | if (<expression>) <statement> <else_clause>
-                | while (<expression>) <statement> */
+                | while (<expression>) <statement>
+                | printf(<id>); */
 AST statement() :
 {
     Token t;
+    Token t1, t2;
     AST tree, op, l, r; 
     AST r1, r2; // two possible right child for "if" op
 }

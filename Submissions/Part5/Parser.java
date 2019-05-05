@@ -5,7 +5,10 @@ import java.util.*;
 public class Parser implements ParserConstants {
    public static void main(String[] args) throws ParseException, FileNotFoundException {
       Parser parser = new Parser(new FileInputStream(args[0]));
-      parser.Input();
+      AST tree = parser.Input();
+      System.out.println("Parsing the input file...");
+      System.out.println("-------------------------");
+      toString(tree, 1);
    }
 
    // indentation
@@ -36,11 +39,8 @@ public class Parser implements ParserConstants {
 // return the AST after parsing the input file
   static final public AST Input() throws ParseException {
     AST tree = null;
-      System.out.println("Parsing the input file...");
-      System.out.println("-------------------------");
     tree = program();
     jj_consume_token(0);
-      toString(tree, 1);
       {if (true) return tree;}
     throw new Error("Missing return statement in function");
   }
@@ -187,9 +187,11 @@ BEGIN: Specification of language
 /* <statement>  → <variable> <assignop> <expression>;
                 | <block>
                 | if (<expression>) <statement> <else_clause>
-                | while (<expression>) <statement> */
+                | while (<expression>) <statement>
+                | printf(<id>); */
   static final public AST statement() throws ParseException {
     Token t;
+    Token t1, t2;
     AST tree, op, l, r;
     AST r1, r2;
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
@@ -492,11 +494,6 @@ BEGIN: Specification of language
     return false;
   }
 
-  static private boolean jj_3R_15() {
-    if (jj_scan_token(BEGIN)) return true;
-    return false;
-  }
-
   static private boolean jj_3R_9() {
     if (jj_3R_14()) return true;
     return false;
@@ -523,6 +520,11 @@ BEGIN: Specification of language
 
   static private boolean jj_3R_19() {
     if (jj_scan_token(OPENPAREN)) return true;
+    return false;
+  }
+
+  static private boolean jj_3R_15() {
+    if (jj_scan_token(BEGIN)) return true;
     return false;
   }
 

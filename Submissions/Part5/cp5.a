@@ -1,0 +1,41 @@
+			.data
+m:			.word 0
+n:			.word 0
+t:			.word 0
+nline:		.asciiz"\n"
+
+			.text
+			.globl main
+main:
+			li $t0, 9
+			sw $t0, m
+			li $t0, 8
+			sw $t0, n
+			lw $t0, m
+			lw $t1, n
+			sub $t0, $t0, $t1
+			sw $t0, t
+
+			# print t
+            lw $a0, t
+            li $v0, 1
+            syscall
+
+            #newline
+            la $a0, nline
+            li $v0, 4
+            syscall
+
+			li $v0, 10
+			syscall
+
+
+
+
+
+
+
+
+
+
+

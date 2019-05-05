@@ -1,0 +1,11 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - CodeGen",
+            "request": "launch",
+            "mainClass": "CodeGen",
+            "projectName": "CS230---Compiler-Design_e46f15d4"
+        }
+    ]
+}
